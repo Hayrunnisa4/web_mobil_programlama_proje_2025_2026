@@ -1,0 +1,31 @@
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(120) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(20) DEFAULT 'student',
+    created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE TABLE books (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    author VARCHAR(120),
+    category VARCHAR(120),
+    stock INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE TABLE loans (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    loan_date TIMESTAMP DEFAULT NOW(),
+    return_date TIMESTAMP,
+    returned BOOLEAN DEFAULT false
+);
+CREATE TABLE reservations (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    notified BOOLEAN DEFAULT false
+);
