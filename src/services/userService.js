@@ -1,17 +1,23 @@
 import pool from '../config/database.js';
 import { hashPassword, comparePassword } from '../utils/password.js';
-
-const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID;
+import { resolveTenantId } from './tenantService.js';
 
 export async function registerUser({
   fullName,
   email,
   password,
   role = 'student',
-  tenantId = DEFAULT_TENANT_ID,
+  tenantId,
+  tenantSlug,
+  fallbackTenantId,
 }) {
   const client = await pool.connect();
   try {
+    const resolvedTenantId = await resolveTenantId({
+      tenantId,
+      tenantSlug,
+      fallbackTenantId,
+    });
     const passwordHash = await hashPassword(password);
     const insertQuery = `
       INSERT INTO users (tenant_id, full_name, email, password_hash, role)
@@ -19,7 +25,7 @@ export async function registerUser({
       RETURNING id, tenant_id AS "tenantId", full_name AS "fullName", email, role, created_at AS "createdAt"
     `;
     const { rows } = await client.query(insertQuery, [
-      tenantId,
+      resolvedTenantId,
       fullName,
       email.toLowerCase(),
       passwordHash,
@@ -38,13 +44,24 @@ export async function registerUser({
   }
 }
 
-export async function authenticateUser({ email, password, tenantId = DEFAULT_TENANT_ID }) {
+export async function authenticateUser({
+  email,
+  password,
+  tenantId,
+  tenantSlug,
+  fallbackTenantId,
+}) {
+  const resolvedTenantId = await resolveTenantId({
+    tenantId,
+    tenantSlug,
+    fallbackTenantId,
+  });
   const query = `
     SELECT id, tenant_id AS "tenantId", full_name AS "fullName", email, password_hash AS "passwordHash", role
     FROM users
     WHERE email = $1 AND tenant_id = $2
   `;
-  const { rows } = await pool.query(query, [email.toLowerCase(), tenantId]);
+  const { rows } = await pool.query(query, [email.toLowerCase(), resolvedTenantId]);
 
   if (!rows.length) {
     const error = new Error('Email veya şifre hatalı');
@@ -63,7 +80,7 @@ export async function authenticateUser({ email, password, tenantId = DEFAULT_TEN
   return user;
 }
 
-export async function getUsersByTenant(tenantId = DEFAULT_TENANT_ID) {
+export async function getUsersByTenant(tenantId) {
   const query = `
     SELECT id, tenant_id AS "tenantId", full_name AS "fullName", email, role, created_at AS "createdAt"
     FROM users

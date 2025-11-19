@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { borrow, getLoans, returnLoan } from '../controllers/loanController.js';
+import { borrow, getLoans, getOwnLoans, returnLoan } from '../controllers/loanController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = Router();
 
 router.get('/', authenticate, authorize('admin'), getLoans);
+router.get('/me', authenticate, authorize('student', 'admin'), getOwnLoans);
 
 router.post(
   '/',

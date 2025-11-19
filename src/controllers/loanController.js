@@ -1,6 +1,11 @@
 import { validationResult } from 'express-validator';
 import asyncHandler from '../utils/asyncHandler.js';
-import { borrowResource, returnResource, listLoans } from '../services/loanService.js';
+import {
+  borrowResource,
+  returnResource,
+  listLoans,
+  listLoansByUser,
+} from '../services/loanService.js';
 
 export const borrow = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
@@ -24,6 +29,15 @@ export const returnLoan = asyncHandler(async (req, res) => {
 export const getLoans = asyncHandler(async (req, res) => {
   const loans = await listLoans({
     tenantId: req.user.tenantId,
+    status: req.query.status,
+  });
+  res.json({ status: 'success', data: loans });
+});
+
+export const getOwnLoans = asyncHandler(async (req, res) => {
+  const loans = await listLoansByUser({
+    tenantId: req.user.tenantId,
+    userId: req.user.sub,
     status: req.query.status,
   });
   res.json({ status: 'success', data: loans });

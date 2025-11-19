@@ -3,6 +3,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import {
   createReservation,
   listReservations,
+  listReservationsByUser,
   updateReservationStatus,
 } from '../services/reservationService.js';
 
@@ -21,6 +22,14 @@ export const createReservationController = asyncHandler(async (req, res) => {
 
 export const listReservationsController = asyncHandler(async (req, res) => {
   const reservations = await listReservations({ tenantId: req.user.tenantId });
+  res.json({ status: 'success', data: reservations });
+});
+
+export const listOwnReservationsController = asyncHandler(async (req, res) => {
+  const reservations = await listReservationsByUser({
+    tenantId: req.user.tenantId,
+    userId: req.user.sub,
+  });
   res.json({ status: 'success', data: reservations });
 });
 

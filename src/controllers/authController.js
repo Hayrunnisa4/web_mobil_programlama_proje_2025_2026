@@ -8,7 +8,7 @@ export const register = asyncHandler(async (req, res) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({ status: 'error', errors: errors.array() });
   }
-  const { fullName, email, password, tenantId } = req.body;
+  const { fullName, email, password, tenantId, tenantSlug } = req.body;
   const role =
     req.user?.role === 'admin' && req.body.role ? req.body.role : 'student';
   const user = await registerUser({
@@ -17,6 +17,8 @@ export const register = asyncHandler(async (req, res) => {
     password,
     role,
     tenantId,
+    tenantSlug,
+    fallbackTenantId: req.user?.tenantId,
   });
   res.status(201).json({ status: 'success', data: user });
 });
@@ -26,8 +28,13 @@ export const login = asyncHandler(async (req, res) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({ status: 'error', errors: errors.array() });
   }
-  const { email, password, tenantId } = req.body;
-  const user = await authenticateUser({ email, password, tenantId });
+  const { email, password, tenantId, tenantSlug } = req.body;
+  const user = await authenticateUser({
+    email,
+    password,
+    tenantId,
+    tenantSlug,
+  });
   const token = signToken({
     sub: user.id,
     role: user.role,

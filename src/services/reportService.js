@@ -1,8 +1,11 @@
 import pool from '../config/database.js';
 
-const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID;
-
-export async function getOverdueLoans(tenantId = DEFAULT_TENANT_ID) {
+export async function getOverdueLoans(tenantId) {
+  if (!tenantId) {
+    const error = new Error('Tenant bilgisi gerekli');
+    error.status = 400;
+    throw error;
+  }
   const query = `
     SELECT l.id, l.due_at AS "dueAt", r.title AS "resourceTitle",
            u.full_name AS "userName", u.email AS "userEmail",
@@ -18,7 +21,12 @@ export async function getOverdueLoans(tenantId = DEFAULT_TENANT_ID) {
   return rows;
 }
 
-export async function getTopBorrowedResources(tenantId = DEFAULT_TENANT_ID) {
+export async function getTopBorrowedResources(tenantId) {
+  if (!tenantId) {
+    const error = new Error('Tenant bilgisi gerekli');
+    error.status = 400;
+    throw error;
+  }
   const query = `
     SELECT r.title, r.topic, COUNT(*)::INT AS "borrowCount"
     FROM loans l

@@ -1,13 +1,18 @@
 import pool from '../config/database.js';
-
-const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID;
+import { promoteNextReservation } from './reservationService.js';
+import logger from '../utils/logger.js';
 
 export async function borrowResource({
-  tenantId = DEFAULT_TENANT_ID,
+  tenantId,
   resourceId,
   userId,
   dueAt,
 }) {
+  if (!tenantId) {
+    const error = new Error('Tenant bilgisi gerekli');
+    error.status = 400;
+    throw error;
+  }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -53,7 +58,12 @@ export async function borrowResource({
   }
 }
 
-export async function returnResource(loanId, tenantId = DEFAULT_TENANT_ID) {
+export async function returnResource(loanId, tenantId) {
+  if (!tenantId) {
+    const error = new Error('Tenant bilgisi gerekli');
+    error.status = 400;
+    throw error;
+  }
   const query = `
     UPDATE loans
     SET status = 'returned', returned_at = NOW()
@@ -67,13 +77,27 @@ export async function returnResource(loanId, tenantId = DEFAULT_TENANT_ID) {
     error.status = 404;
     throw error;
   }
-  return rows[0];
+  const loan = rows[0];
+  const reservation = await promoteNextReservation(loan.resourceId, tenantId);
+  if (reservation) {
+    logger.info('Rezervasyon kuyruğu güncellendi', {
+      reservationId: reservation.id,
+      userId: reservation.userId,
+      resourceId: reservation.resourceId,
+    });
+  }
+  return loan;
 }
 
 export async function listLoans({
-  tenantId = DEFAULT_TENANT_ID,
+  tenantId,
   status,
 }) {
+  if (!tenantId) {
+    const error = new Error('Tenant bilgisi gerekli');
+    error.status = 400;
+    throw error;
+  }
   const conditions = ['l.tenant_id = $1'];
   const values = [tenantId];
   if (status) {
@@ -89,6 +113,35 @@ export async function listLoans({
     FROM loans l
     JOIN resources r ON r.id = l.resource_id
     JOIN users u ON u.id = l.user_id
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY l.borrowed_at DESC
+  `;
+  const { rows } = await pool.query(query, values);
+  return rows;
+}
+
+export async function listLoansByUser({
+  tenantId,
+  userId,
+  status,
+}) {
+  if (!tenantId || !userId) {
+    const error = new Error('Tenant ve kullanıcı bilgisi gerekli');
+    error.status = 400;
+    throw error;
+  }
+  const conditions = ['l.tenant_id = $1', 'l.user_id = $2'];
+  const values = [tenantId, userId];
+  if (status) {
+    conditions.push('l.status = $3');
+    values.push(status);
+  }
+  const query = `
+    SELECT l.id, l.status, l.borrowed_at AS "borrowedAt", l.due_at AS "dueAt",
+           l.returned_at AS "returnedAt",
+           r.title AS "resourceTitle"
+    FROM loans l
+    JOIN resources r ON r.id = l.resource_id
     WHERE ${conditions.join(' AND ')}
     ORDER BY l.borrowed_at DESC
   `;

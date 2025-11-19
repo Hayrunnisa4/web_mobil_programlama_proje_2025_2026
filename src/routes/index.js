@@ -4,6 +4,7 @@ import resourceRoutes from './resourceRoutes.js';
 import loanRoutes from './loanRoutes.js';
 import reservationRoutes from './reservationRoutes.js';
 import reportRoutes from './reportRoutes.js';
+import tenantRoutes from './tenantRoutes.js';
 
 const router = Router();
 
@@ -12,6 +13,7 @@ router.use('/resources', resourceRoutes);
 router.use('/loans', loanRoutes);
 router.use('/reservations', reservationRoutes);
 router.use('/reports', reportRoutes);
+router.use('/tenants', tenantRoutes);
 
 export default router;
 

@@ -3,6 +3,7 @@ import { body } from 'express-validator';
 import {
   createReservationController,
   listReservationsController,
+  listOwnReservationsController,
   updateReservationController,
 } from '../controllers/reservationController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
@@ -10,6 +11,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 const router = Router();
 
 router.get('/', authenticate, authorize('admin'), listReservationsController);
+router.get('/me', authenticate, authorize('student', 'admin'), listOwnReservationsController);
 
 router.post(
   '/',

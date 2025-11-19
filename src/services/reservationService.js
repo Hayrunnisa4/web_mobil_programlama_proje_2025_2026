@@ -1,12 +1,16 @@
 import pool from '../config/database.js';
-
-const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID;
+import logger from '../utils/logger.js';
 
 export async function createReservation({
-  tenantId = DEFAULT_TENANT_ID,
+  tenantId,
   resourceId,
   userId,
 }) {
+  if (!tenantId) {
+    const error = new Error('Tenant bilgisi gerekli');
+    error.status = 400;
+    throw error;
+  }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -41,7 +45,12 @@ export async function createReservation({
   }
 }
 
-export async function listReservations({ tenantId = DEFAULT_TENANT_ID }) {
+export async function listReservations({ tenantId }) {
+  if (!tenantId) {
+    const error = new Error('Tenant bilgisi gerekli');
+    error.status = 400;
+    throw error;
+  }
   const query = `
     SELECT res.id, res.status, res.position, res.created_at AS "createdAt",
            r.title AS "resourceTitle",
@@ -57,7 +66,30 @@ export async function listReservations({ tenantId = DEFAULT_TENANT_ID }) {
   return rows;
 }
 
-export async function updateReservationStatus(id, status, tenantId = DEFAULT_TENANT_ID) {
+export async function listReservationsByUser({ tenantId, userId }) {
+  if (!tenantId || !userId) {
+    const error = new Error('Tenant ve kullanıcı bilgisi gerekli');
+    error.status = 400;
+    throw error;
+  }
+  const query = `
+    SELECT res.id, res.status, res.position, res.created_at AS "createdAt",
+           r.title AS "resourceTitle"
+    FROM reservations res
+    JOIN resources r ON r.id = res.resource_id
+    WHERE res.tenant_id = $1 AND res.user_id = $2
+    ORDER BY res.created_at ASC
+  `;
+  const { rows } = await pool.query(query, [tenantId, userId]);
+  return rows;
+}
+
+export async function updateReservationStatus(id, status, tenantId) {
+  if (!tenantId) {
+    const error = new Error('Tenant bilgisi gerekli');
+    error.status = 400;
+    throw error;
+  }
   const query = `
     UPDATE reservations
     SET status = $1
@@ -71,5 +103,32 @@ export async function updateReservationStatus(id, status, tenantId = DEFAULT_TEN
     throw error;
   }
   return rows[0];
+}
+
+export async function promoteNextReservation(resourceId, tenantId) {
+  if (!tenantId) {
+    const error = new Error('Tenant bilgisi gerekli');
+    error.status = 400;
+    throw error;
+  }
+  const query = `
+    UPDATE reservations
+    SET status = 'notified'
+    WHERE id = (
+      SELECT id
+      FROM reservations
+      WHERE tenant_id = $1
+        AND resource_id = $2
+        AND status = 'waiting'
+      ORDER BY position ASC
+      LIMIT 1
+    )
+    RETURNING id, resource_id AS "resourceId", user_id AS "userId", position
+  `;
+  const { rows } = await pool.query(query, [tenantId, resourceId]);
+  if (rows[0]) {
+    logger.info('Rezervasyon kuyruğundan kullanıcı bilgilendirildi', rows[0]);
+  }
+  return rows[0] || null;
 }
 

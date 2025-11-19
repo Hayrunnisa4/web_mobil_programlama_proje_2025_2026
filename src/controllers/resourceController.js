@@ -7,6 +7,7 @@ import {
   deleteResource,
   getResourceById,
 } from '../services/resourceService.js';
+import { resolveTenantId } from '../services/tenantService.js';
 
 export const getResources = asyncHandler(async (req, res) => {
   const filters = {
@@ -14,9 +15,18 @@ export const getResources = asyncHandler(async (req, res) => {
     author: req.query.author,
     topic: req.query.topic,
     difficulty: req.query.difficulty,
+    search: req.query.q,
+    availableOnly: ['true', '1', 'yes'].includes(
+      String(req.query.availableOnly).toLowerCase(),
+    ),
+    sortBy: req.query.sortBy,
   };
-  const resources = await listResources({
+  const tenantId = await resolveTenantId({
     tenantId: req.user?.tenantId || req.query.tenantId,
+    tenantSlug: req.query.tenantSlug,
+  });
+  const resources = await listResources({
+    tenantId,
     filters,
   });
   res.json({ status: 'success', data: resources });
@@ -35,7 +45,11 @@ export const createResourceController = asyncHandler(async (req, res) => {
 });
 
 export const getResource = asyncHandler(async (req, res) => {
-  const resource = await getResourceById(req.params.id, req.user?.tenantId);
+  const tenantId = await resolveTenantId({
+    tenantId: req.user?.tenantId || req.query.tenantId,
+    tenantSlug: req.query.tenantSlug,
+  });
+  const resource = await getResourceById(req.params.id, tenantId);
   res.json({ status: 'success', data: resource });
 });
 
