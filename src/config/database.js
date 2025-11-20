@@ -1,15 +1,26 @@
 import dotenv from 'dotenv';
 import pkg from 'pg';
 
-// Proje kökündeki .env dosyasını her yerden (scripts vs.) doğru okumak için:
+const { Pool } = pkg;
+
+// Load .env from project root
 const envPath = new URL('../../.env', import.meta.url);
 dotenv.config({ path: envPath });
 
-const { Pool } = pkg;
+// Determine if SSL should be enabled
+const enableSSL =
+  process.env.NODE_ENV === 'production' ||
+  process.env.PGSSLMODE === 'require' ||
+  (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('sslmode=require'));
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : undefined,
+  ssl: enableSSL
+    ? {
+        require: true,
+        rejectUnauthorized: false,
+      }
+    : false,
 });
 
 pool.on('error', (err) => {
@@ -18,4 +29,3 @@ pool.on('error', (err) => {
 });
 
 export default pool;
-
