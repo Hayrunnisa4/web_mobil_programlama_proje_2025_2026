@@ -48,6 +48,18 @@ export async function borrowResource({
       dueAt,
     ]);
 
+    // Kullanıcının bu kaynak için aktif rezervasyonunu fulfilled yap
+    const updateResult = await client.query(
+      `UPDATE reservations 
+       SET status = 'fulfilled' 
+       WHERE tenant_id = $1 AND resource_id = $2 AND user_id = $3 
+       AND status IN ('waiting', 'notified')`,
+      [tenantId, resourceId, userId],
+    );
+    if (updateResult.rowCount > 0) {
+      logger.info(`Rezervasyon fulfilled yapıldı: ${updateResult.rowCount} adet`);
+    }
+
     await client.query('COMMIT');
     return rows[0];
   } catch (err) {
@@ -58,22 +70,54 @@ export async function borrowResource({
   }
 }
 
-export async function returnResource(loanId, tenantId) {
-  if (!tenantId) {
-    const error = new Error('Tenant bilgisi gerekli');
+// Öğrenci iade talebi oluşturur
+export async function requestReturn(loanId, tenantId, userId) {
+  if (!tenantId || !userId) {
+    const error = new Error('Tenant ve kullanıcı bilgisi gerekli');
     error.status = 400;
     throw error;
   }
   const query = `
     UPDATE loans
-    SET status = 'returned', returned_at = NOW()
-    WHERE id = $1 AND tenant_id = $2 AND status = 'borrowed'
+    SET status = 'pending_return'
+    WHERE id = $1 AND tenant_id = $2 AND user_id = $3 AND status IN ('borrowed', 'overdue')
     RETURNING id, resource_id AS "resourceId", user_id AS "userId",
               borrowed_at AS "borrowedAt", due_at AS "dueAt", returned_at AS "returnedAt", status
   `;
-  const { rows } = await pool.query(query, [loanId, tenantId]);
+  const { rows } = await pool.query(query, [loanId, tenantId, userId]);
   if (!rows.length) {
-    const error = new Error('Aktif ödünç kaydı bulunamadı');
+    const error = new Error('Aktif ödünç kaydı bulunamadı veya zaten iade talebi oluşturulmuş');
+    error.status = 404;
+    throw error;
+  }
+  return rows[0];
+}
+
+// Admin iade talebini onaylar (gerçek iade işlemi)
+export async function returnResource(loanId, tenantId, userId = null, userRole = null) {
+  if (!tenantId) {
+    const error = new Error('Tenant bilgisi gerekli');
+    error.status = 400;
+    throw error;
+  }
+  // Admin sadece pending_return olanları onaylayabilir
+  const whereClause = userRole === 'admin'
+    ? 'id = $1 AND tenant_id = $2 AND status = $3'
+    : 'id = $1 AND tenant_id = $2 AND status = $3';
+  const queryParams = userRole === 'admin'
+    ? [loanId, tenantId, 'pending_return']
+    : [loanId, tenantId, 'borrowed'];
+  
+  const query = `
+    UPDATE loans
+    SET status = 'returned', returned_at = NOW()
+    WHERE ${whereClause}
+    RETURNING id, resource_id AS "resourceId", user_id AS "userId",
+              borrowed_at AS "borrowedAt", due_at AS "dueAt", returned_at AS "returnedAt", status
+  `;
+  const { rows } = await pool.query(query, queryParams);
+  if (!rows.length) {
+    const error = new Error('İade talebi bulunamadı');
     error.status = 404;
     throw error;
   }
@@ -138,14 +182,19 @@ export async function listLoansByUser({
   }
   const query = `
     SELECT l.id, l.status, l.borrowed_at AS "borrowedAt", l.due_at AS "dueAt",
-           l.returned_at AS "returnedAt",
-           r.title AS "resourceTitle"
+           l.returned_at AS "returnedAt", l.resource_id AS "resourceId",
+           r.title AS "resourceTitle",
+           rev.rating, rev.comment
     FROM loans l
     JOIN resources r ON r.id = l.resource_id
+    LEFT JOIN reviews rev ON rev.loan_id = l.id
     WHERE ${conditions.join(' AND ')}
     ORDER BY l.borrowed_at DESC
   `;
   const { rows } = await pool.query(query, values);
-  return rows;
+  return rows.map((row) => ({
+    ...row,
+    review: row.rating ? { rating: row.rating, comment: row.comment } : null,
+  }));
 }
 

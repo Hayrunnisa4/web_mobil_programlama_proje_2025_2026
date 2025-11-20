@@ -44,7 +44,8 @@ export async function listResources({ tenantId, filters = {} }) {
 
   const query = `
     SELECT id, title, author, topic, difficulty, total_stock AS "totalStock",
-           available_stock AS "availableStock", description, created_at AS "createdAt"
+           available_stock AS "availableStock", description, image_url AS "imageUrl",
+           created_at AS "createdAt"
     FROM resources
     WHERE ${conditions.join(' AND ')}
     ORDER BY ${orderBy}
@@ -62,6 +63,7 @@ export async function createResource({
   difficulty,
   totalStock = 1,
   description,
+  imageUrl,
 }) {
   if (!tenantId) {
     const error = new Error('Tenant bilgisi gerekli');
@@ -69,10 +71,10 @@ export async function createResource({
     throw error;
   }
   const query = `
-    INSERT INTO resources (tenant_id, title, author, topic, difficulty, total_stock, available_stock, description)
-    VALUES ($1, $2, $3, $4, $5, $6, $6, $7)
+    INSERT INTO resources (tenant_id, title, author, topic, difficulty, total_stock, available_stock, description, image_url)
+    VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8)
     RETURNING id, title, author, topic, difficulty, total_stock AS "totalStock",
-              available_stock AS "availableStock", description
+              available_stock AS "availableStock", description, image_url AS "imageUrl"
   `;
   const { rows } = await pool.query(query, [
     tenantId,
@@ -82,6 +84,7 @@ export async function createResource({
     difficulty,
     totalStock,
     description,
+    imageUrl,
   ]);
   return rows[0];
 }
@@ -100,6 +103,7 @@ export async function updateResource(id, tenantId, updates) {
     let column = key;
     if (key === 'totalStock') column = 'total_stock';
     if (key === 'availableStock') column = 'available_stock';
+    if (key === 'imageUrl') column = 'image_url';
     setClauses.push(`${column} = $${setClauses.length + 3}`);
     values.push(value);
   });
@@ -113,7 +117,7 @@ export async function updateResource(id, tenantId, updates) {
     SET ${setClauses.join(', ')}
     WHERE id = $1 AND tenant_id = $2
     RETURNING id, title, author, topic, difficulty, total_stock AS "totalStock",
-              available_stock AS "availableStock", description
+              available_stock AS "availableStock", description, image_url AS "imageUrl"
   `;
   const { rows } = await pool.query(query, [id, tenantId, ...values]);
   if (!rows.length) {
@@ -148,7 +152,7 @@ export async function getResourceById(id, tenantId) {
   }
   const query = `
     SELECT id, title, author, topic, difficulty, total_stock AS "totalStock",
-           available_stock AS "availableStock", description
+           available_stock AS "availableStock", description, image_url AS "imageUrl"
     FROM resources
     WHERE id = $1 AND tenant_id = $2
   `;

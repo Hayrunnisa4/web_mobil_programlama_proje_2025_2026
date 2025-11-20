@@ -3,6 +3,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import {
   borrowResource,
   returnResource,
+  requestReturn,
   listLoans,
   listLoansByUser,
 } from '../services/loanService.js';
@@ -21,8 +22,15 @@ export const borrow = asyncHandler(async (req, res) => {
   res.status(201).json({ status: 'success', data: loan });
 });
 
+// Öğrenci iade talebi oluşturur
+export const requestReturnLoan = asyncHandler(async (req, res) => {
+  const loan = await requestReturn(req.params.id, req.user.tenantId, req.user.sub);
+  res.json({ status: 'success', data: loan });
+});
+
+// Admin iade talebini onaylar
 export const returnLoan = asyncHandler(async (req, res) => {
-  const loan = await returnResource(req.params.id, req.user.tenantId);
+  const loan = await returnResource(req.params.id, req.user.tenantId, req.user.sub, req.user.role);
   res.json({ status: 'success', data: loan });
 });
 

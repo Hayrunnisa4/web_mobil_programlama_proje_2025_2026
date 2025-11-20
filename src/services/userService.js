@@ -51,17 +51,32 @@ export async function authenticateUser({
   tenantSlug,
   fallbackTenantId,
 }) {
-  const resolvedTenantId = await resolveTenantId({
-    tenantId,
-    tenantSlug,
-    fallbackTenantId,
-  });
-  const query = `
+  // Önce email'e göre kullanıcıyı bul (tenant bilgisi olmadan)
+  let query = `
     SELECT id, tenant_id AS "tenantId", full_name AS "fullName", email, password_hash AS "passwordHash", role
     FROM users
-    WHERE email = $1 AND tenant_id = $2
+    WHERE email = $1
   `;
-  const { rows } = await pool.query(query, [email.toLowerCase(), resolvedTenantId]);
+  let rows = (await pool.query(query, [email.toLowerCase()])).rows;
+
+  // Eğer tenant bilgisi verilmişse, o tenant'a göre filtrele
+  if (tenantId || tenantSlug || fallbackTenantId) {
+    try {
+      const resolvedTenantId = await resolveTenantId({
+        tenantId,
+        tenantSlug,
+        fallbackTenantId,
+      });
+      rows = rows.filter((row) => row.tenantId === resolvedTenantId);
+    } catch (err) {
+      // Tenant bulunamazsa, tüm kullanıcıları kontrol et (email zaten unique olmalı)
+      // Ama yine de tenant bilgisi verilmişse ve bulunamazsa, boş bırak
+      if (tenantSlug) {
+        // Tenant slug verilmiş ama bulunamadı, kullanıcıyı bulamayız
+        rows = [];
+      }
+    }
+  }
 
   if (!rows.length) {
     const error = new Error('Email veya şifre hatalı');
@@ -69,6 +84,7 @@ export async function authenticateUser({
     throw error;
   }
 
+  // Şifre kontrolü
   const user = rows[0];
   const isValid = await comparePassword(password, user.passwordHash);
   if (!isValid) {

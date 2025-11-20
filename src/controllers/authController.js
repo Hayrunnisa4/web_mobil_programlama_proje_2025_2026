@@ -8,14 +8,30 @@ export const register = asyncHandler(async (req, res) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({ status: 'error', errors: errors.array() });
   }
-  const { fullName, email, password, tenantId, tenantSlug } = req.body;
-  const role =
-    req.user?.role === 'admin' && req.body.role ? req.body.role : 'student';
+  const { fullName, email, password, tenantId, tenantSlug, role: requestedRole } = req.body;
+  
+  // Admin oluşturmak için admin token'ı zorunlu
+  let finalRole = 'student';
+  if (requestedRole === 'admin') {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Admin kullanıcı oluşturmak için admin yetkisi gereklidir',
+      });
+    }
+    finalRole = 'admin';
+  } else if (requestedRole && requestedRole !== 'student') {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Geçersiz rol. Sadece student veya admin (admin token ile) seçilebilir',
+    });
+  }
+
   const user = await registerUser({
     fullName,
     email,
     password,
-    role,
+    role: finalRole,
     tenantId,
     tenantSlug,
     fallbackTenantId: req.user?.tenantId,

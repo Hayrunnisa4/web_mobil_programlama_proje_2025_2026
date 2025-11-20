@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { borrow, getLoans, getOwnLoans, returnLoan } from '../controllers/loanController.js';
+import { borrow, getLoans, getOwnLoans, returnLoan, requestReturnLoan } from '../controllers/loanController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = Router();
@@ -19,6 +19,7 @@ router.post(
   borrow,
 );
 
+router.post('/:id/return-request', authenticate, authorize('student'), requestReturnLoan);
 router.post('/:id/return', authenticate, authorize('admin'), returnLoan);
 
 export default router;

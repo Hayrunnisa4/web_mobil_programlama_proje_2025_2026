@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS loans (
     borrowed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     due_at TIMESTAMP WITH TIME ZONE NOT NULL,
     returned_at TIMESTAMP WITH TIME ZONE,
-    status TEXT NOT NULL CHECK (status IN ('borrowed', 'returned', 'overdue'))
+    status TEXT NOT NULL CHECK (status IN ('borrowed', 'returned', 'overdue', 'pending_return'))
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_loans_unique_active

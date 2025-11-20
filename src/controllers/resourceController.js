@@ -54,6 +54,10 @@ export const getResource = asyncHandler(async (req, res) => {
 });
 
 export const updateResourceController = asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ status: 'error', errors: errors.array() });
+  }
   const resource = await updateResource(req.params.id, req.user?.tenantId, req.body);
   res.json({ status: 'success', data: resource });
 });

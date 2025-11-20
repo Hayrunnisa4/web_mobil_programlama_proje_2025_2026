@@ -25,6 +25,10 @@ router.post(
     body('fullName').notEmpty().withMessage('İsim alanı zorunlu'),
     emailValidator,
     passwordValidator,
+    body('role')
+      .optional()
+      .isIn(['admin', 'student'])
+      .withMessage('Rol admin veya student olmalıdır'),
     tenantSlugValidator,
     tenantIdValidator,
   ],
@@ -38,12 +42,7 @@ router.post(
     passwordValidator,
     tenantSlugValidator,
     tenantIdValidator,
-    body().custom((_, { req }) => {
-      if (!req.body.tenantId && !req.body.tenantSlug) {
-        throw new Error('tenantId veya tenantSlug alanlarından biri zorunlu');
-      }
-      return true;
-    }),
+    // Tenant bilgisi artık opsiyonel - email'e göre kullanıcı bulunacak
   ],
   login,
 );
