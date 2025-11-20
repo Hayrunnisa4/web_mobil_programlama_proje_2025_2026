@@ -100,37 +100,42 @@ export async function returnResource(loanId, tenantId, userId = null, userRole =
     error.status = 400;
     throw error;
   }
-  // Admin sadece pending_return olanları onaylayabilir
-  const whereClause = userRole === 'admin'
-    ? 'id = $1 AND tenant_id = $2 AND status = $3'
-    : 'id = $1 AND tenant_id = $2 AND status = $3';
-  const queryParams = userRole === 'admin'
-    ? [loanId, tenantId, 'pending_return']
-    : [loanId, tenantId, 'borrowed'];
-  
-  const query = `
-    UPDATE loans
-    SET status = 'returned', returned_at = NOW()
-    WHERE ${whereClause}
-    RETURNING id, resource_id AS "resourceId", user_id AS "userId",
-              borrowed_at AS "borrowedAt", due_at AS "dueAt", returned_at AS "returnedAt", status
-  `;
-  const { rows } = await pool.query(query, queryParams);
-  if (!rows.length) {
-    const error = new Error('İade talebi bulunamadı');
-    error.status = 404;
-    throw error;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const statusFilter = userRole === 'admin' ? 'pending_return' : 'borrowed';
+    const loanQuery = `
+      UPDATE loans
+      SET status = 'returned', returned_at = NOW()
+      WHERE id = $1 AND tenant_id = $2 AND status = $3
+      RETURNING id, resource_id AS "resourceId", user_id AS "userId",
+                borrowed_at AS "borrowedAt", due_at AS "dueAt", returned_at AS "returnedAt", status
+    `;
+    const { rows } = await client.query(loanQuery, [loanId, tenantId, statusFilter]);
+    if (!rows.length) {
+      const error = new Error('İade talebi bulunamadı');
+      error.status = 404;
+      throw error;
+    }
+    const loan = rows[0];
+
+    await client.query('COMMIT');
+
+    const reservation = await promoteNextReservation(loan.resourceId, tenantId);
+    if (reservation) {
+      logger.info('Rezervasyon kuyruğu güncellendi', {
+        reservationId: reservation.id,
+        userId: reservation.userId,
+        resourceId: reservation.resourceId,
+      });
+    }
+    return loan;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
-  const loan = rows[0];
-  const reservation = await promoteNextReservation(loan.resourceId, tenantId);
-  if (reservation) {
-    logger.info('Rezervasyon kuyruğu güncellendi', {
-      reservationId: reservation.id,
-      userId: reservation.userId,
-      resourceId: reservation.resourceId,
-    });
-  }
-  return loan;
 }
 
 export async function listLoans({

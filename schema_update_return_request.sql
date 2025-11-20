@@ -8,3 +8,4 @@ ALTER TABLE loans
 ADD CONSTRAINT loans_status_check 
 CHECK (status IN ('borrowed', 'returned', 'overdue', 'pending_return'));
 
+
