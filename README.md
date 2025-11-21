@@ -1,6 +1,6 @@
 # Deneyap Kütüphane Backend
 
-Node.js + Express tabanlı bu servis, Deneyap atölyeleri için çok kiracılı (multi-tenant) kütüphane ve kaynak yönetimini sağlar.
+Node.js + Express tabanlı bu servis, Deneyap atölyeleri için çok müşterili kütüphane ve kaynak yönetimini sağlar.
 
 ## Canlı Ortam
 
@@ -24,7 +24,7 @@ Node.js + Express tabanlı bu servis, Deneyap atölyeleri için çok kiracılı 
    ```bash
    cp .env.example .env      # PowerShell: copy .env.example .env
    ```
-   `DATABASE_URL`, `JWT_SECRET`, `DEFAULT_TENANT_ID` gibi değerleri güncelleyin.
+   `DATABASE_URL`, `JWT_SECRET` gibi değerleri güncelleyin.
 
 3. Veritabanı şemasını uygulayın
    ```bash
@@ -35,7 +35,7 @@ Node.js + Express tabanlı bu servis, Deneyap atölyeleri için çok kiracılı 
    ```bash
    npm run seed
    ```
-   Script, varsayılan tenantı, örnek kaynakları ve `student@example.com / student123` öğrencisini oluşturur.
+   Script, örnek kaynakları ve `student@example.com / student123` öğrencisini oluşturur.
 
 5. İlk admin kullanıcısını oluşturun
    ```bash
@@ -64,17 +64,10 @@ Node.js + Express tabanlı bu servis, Deneyap atölyeleri için çok kiracılı 
 | `/api/reservations/me` | GET | student/admin | Kullanıcının rezervasyonları |
 | `/api/reports/overdue` | GET | admin | Süresi geçenler |
 | `/api/reports/top-borrowed` | GET | admin | En çok ödünç alınanlar |
-| `/api/tenants` | GET/POST | admin | Tenant listele / oluştur |
-| `/api/tenants/:id` | PUT/DELETE | admin | Tenant güncelle / sil |
 | `/docs` | GET | - | Swagger UI dokümantasyonu |
 
 Tüm isteklerde `Authorization: Bearer <token>` başlığı kullanılmalıdır (login hariç).
 
-### Tenant bazlı kimlik doğrulama
-
-- Login isteğinde `tenantSlug` (veya `tenantId`) alanlarından biri zorunludur.
-- Admin kullanıcıları yeni tenant tanımlamak için `/api/tenants` uçlarını kullanabilir.
-- Öğrenci kaydı yapılırken `tenantSlug` gönderilebilir; adminler token kullanarak kendi tenant'larında kullanıcı açabilir.
 
 ### Kaynak filtreleri
 
@@ -93,7 +86,6 @@ Tüm isteklerde `Authorization: Bearer <token>` başlığı kullanılmalıdır (
 
 ## Notlar
 
-- Çok kiracılı mantık için `DEFAULT_TENANT_ID` varsayılanı kullanıldı.
 - `schema.sql` temel trigger ve fonksiyonları içerir.
 - Prod ortamında SSL için `PGSSLMODE=require` ayarlayabilirsiniz.
 - Süresi geçen ödünçler `node-cron` ile saatlik tetiklenen `update_overdue_status()` fonksiyonu sayesinde otomatik güncellenir.
